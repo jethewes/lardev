@@ -1,4 +1,4 @@
 true_energy:
 { 
- module_type:                 "incantations/TauAna/TrueEnergy"
+ module_type:                 "lardev/tau/TrueEnergy"
 }
