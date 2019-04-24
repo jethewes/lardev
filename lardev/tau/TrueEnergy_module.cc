@@ -38,6 +38,8 @@ namespace dune {
     double fTnu_directionX, fTnu_directionY, fTnu_directionZ;
     double fTvisible_directionX, fTvisible_directionY, fTvisible_directionZ;
     double fCalo_Energy;
+    int ftau_mode;
+    double fVertexX, fVertexY, fVertexZ;
   }; // class dune::TrueEnergy
 } // namespace dune
 
@@ -57,13 +59,17 @@ dune::TrueEnergy::TrueEnergy(fhicl::ParameterSet const& pset) :
    fTree->Branch("Tvisible_directionY",&fTvisible_directionY,"Tvisible_directionY/D");
    fTree->Branch("Tvisible_directionZ",&fTvisible_directionZ,"Tvisible_directionZ/D");
    fTree->Branch("CaloE", &fCalo_Energy, "CaloE/D");
+   fTree->Branch("Tau_mode", &ftau_mode);
+   fTree->Branch("TvertexX", &fVertexX,"TvertexX/D");
+   fTree->Branch("TvertexY", &fVertexY,"TvertexY/D");
+   fTree->Branch("TvertexZ", &fVertexZ,"TvertexZ/D");
 } // dune::TrueEnergy::TrueEnergy()
 
 void dune::TrueEnergy::analyze(const art:: Event& evt)
 {
-  //double EvtNum = evt.id().event();
+ // double EvtNum = evt.id().event();
   
-  //if(EvtNum == 65864){
+ // if(EvtNum == 65864){
   
   // First, get an art handle to MC truth information
   art::Handle<std::vector<simb::MCTruth>> mct;
@@ -112,18 +118,17 @@ void dune::TrueEnergy::analyze(const art:: Event& evt)
     TVector3 end_momentum = k.End().Momentum().Vect();
     visible_direction += start_momentum - end_momentum;
   }
-//std::cerr<<"[Carlos Energy track ]" << fEnergy_track<<std::endl;
-//visible true energy 
-fTvisible_E = fEnergy_track + fEnergy_Shower;
-//std::cerr<<"[Carlos Visible Energy ]" << fTvisible_E << std::endl;
-//visible direction 
-//std::cerr<<"[Carlos antes ] " << visible_direction.X() << std::endl;
-visible_directionUnit = visible_direction.Unit();
-//std::cerr<<"[Carlos Unitario ]" << visible_directionUnit.X() << std::endl;
+  //std::cerr<<"[Carlos Energy track ]" << fEnergy_track<<std::endl;
+  
+  //visible true energy 
+  fTvisible_E = fEnergy_track + fEnergy_Shower;
+  //std::cerr<<"[Carlos Visible Energy ]" << fTvisible_E << std::endl;
+  //visible direction 
+  visible_directionUnit = visible_direction.Unit();
 
-fTvisible_directionX = visible_directionUnit.X();
-fTvisible_directionY = visible_directionUnit.Y();
-fTvisible_directionZ = visible_directionUnit.Z();
+  fTvisible_directionX = visible_directionUnit.X();
+  fTvisible_directionY = visible_directionUnit.Y();
+  fTvisible_directionZ = visible_directionUnit.Z();
 
   simb::MCNeutrino nu = truthlist[0]->GetNeutrino();
   fTrueE = nu.Nu().E();
@@ -132,11 +137,47 @@ fTvisible_directionZ = visible_directionUnit.Z();
   fTnu_directionX = nu_direction.X();
   fTnu_directionY = nu_direction.Y();
   fTnu_directionZ = nu_direction.Z();
- // std::cerr<<"[Carlos neutrino direction x, y, z ] " << nu_direction.X()<< " "
-  //<<nu_direction.X()<< " " << nu_direction.Z() << std::endl;  
-
+  //std::cerr<<"[Carlos neutrino direction x, y, z ] " << nu_direction.X()<< " " //<<nu_direction.X()<< " " << nu_direction.Z() << std::endl;  
   //Store info in tree
+  
+  //Topology 
+  int tau_mode = 0; // if NC event
+  if(truth.GetNeutrino().CCNC() == simb::kCC) {
+    tau_mode = 1; // if CC hadronic
+    for(int p = 0; p < truth.NParticles(); ++p) {
+       std::cout<<"[Carlos NParticles ] "<< truth.NParticles() << std::endl;  
+       if(truth.GetParticle(p).StatusCode() != 1) continue;
+         int pdg = abs(truth.GetParticle(p).PdgCode());
+         int parent = truth.GetParticle(p).Mother();
+         while(parent > 0) parent = truth.GetParticle(parent).Mother();
+
+         if(parent == 0) {
+           if(pdg == 11) {
+             tau_mode = 2; // if CC nutau -> e
+             break;
+           } else if (pdg == 13) {
+             tau_mode = 3; // if CC nutau -> mu
+             break;
+             }
+         }
+       }
+    //std::cout<<"[Carlos tau_mode: ] "<< tau_mode << std::endl;  
+    }
+  //saving tau_mode 
+  ftau_mode = tau_mode;
+
+  // Get the true neutrino vertex and see if it's contained in
+  TVector3 nu_vtx(truth.GetNeutrino().Nu().Position().Vect());
+  // Save the vertex position
+  fVertexX = nu_vtx.X();
+  fVertexY = nu_vtx.Y();
+  fVertexZ = nu_vtx.Z();
+
+
+
+
   fTree->Fill();
+
  // }  // if EvtNum
  
 } // dune::TrueEnergy::analyze()
